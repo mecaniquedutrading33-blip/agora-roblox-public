@@ -1,4 +1,4 @@
--- Agora Admin Loader v13.0 - Clone UI + charge MainModule via proxy
+-- Agora Admin Loader v15.0 - Corrige function-return MainModule
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
@@ -7,7 +7,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local loaderScript = script
 local folder = loaderScript.Parent
 
-print("[AGORA] Loader v13.0 demarrage...")
+print("[AGORA] Loader v15.0 demarrage...")
 
 -- 1. SETTINGS (optionnel)
 local cfg = {}
@@ -131,13 +131,27 @@ local commands = commandsFn()
 -- 6. Lancer MainModule
 local ok, mm = pcall(MainModule, cfg, commands, folder)
 
-if ok and typeof(mm) == "table" and typeof(mm.Init) == "function" then
-    mm:Init({
-        Settings = cfg,
-        ScriptRef = loaderScript,
-    })
-    print("[AGORA] v14.1 INIT OK (table mode)")
+if not ok then
+    warn("[AGORA] MainModule crash: " .. tostring(mm))
+    return
+end
+
+if typeof(mm) == "function" then
+    -- MainModule retourne une fonction (return function(...) end)
+    local ok2, result = pcall(mm, cfg, commands, folder)
+    if ok2 then
+        if typeof(result) == "table" and typeof(result.Init) == "function" then
+            result:Init({Settings = cfg, ScriptRef = loaderScript})
+            print("[AGORA] v15.0 INIT OK (table mode)")
+        else
+            print("[AGORA] v15.0 INIT OK (function mode)")
+        end
+    else
+        warn("[AGORA] MainModule init crash: " .. tostring(result))
+    end
+elseif typeof(mm) == "table" and typeof(mm.Init) == "function" then
+    mm:Init({Settings = cfg, ScriptRef = loaderScript})
+    print("[AGORA] v15.0 INIT OK (table mode)")
 else
-    -- MainModule s'auto-initialise inline (pas de return)
-    print("[AGORA] v14.1 INIT OK (inline mode)")
+    print("[AGORA] v15.0 INIT OK (inline mode)")
 end
