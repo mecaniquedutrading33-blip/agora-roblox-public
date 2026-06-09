@@ -58,7 +58,20 @@ local function setupUI()
         local clone = screenGui:Clone()
         clone.Name = "AgoraAdmin"  -- Forcer le nom attendu par le client
         clone.Parent = StarterGui
-        print("[AGORA] ScreenGui clone dans StarterGui (nom=AgroaAdmin)")
+        print("[AGORA] ScreenGui clone dans StarterGui")
+
+        -- Play Solo : le joueur local est déjà connecté, StarterGui ne réplique pas
+        for _, plr in ipairs(Players:GetPlayers()) do
+            local pg = plr:WaitForChild("PlayerGui", 3)
+            if pg then
+                local oldGui = pg:FindFirstChild("AgoraAdmin")
+                if oldGui then oldGui:Destroy() end
+                local localClone = screenGui:Clone()
+                localClone.Name = "AgoraAdmin"
+                localClone.Parent = pg
+                print("[AGORA] ScreenGui clone dans PlayerGui de " .. plr.Name)
+            end
+        end
     else
         warn("[AGORA] ScreenGui introuvable dans le dossier")
     end
