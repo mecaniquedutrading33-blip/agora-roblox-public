@@ -52,12 +52,13 @@ local function setupUI()
 
     if screenGui then
         -- Supprimer l'ancien dans StarterGui s'il existe
-        local old = StarterGui:FindFirstChild(screenGui.Name)
+        local old = StarterGui:FindFirstChild("AgoraAdmin")
         if old then old:Destroy() end
 
         local clone = screenGui:Clone()
+        clone.Name = "AgoraAdmin"  -- Forcer le nom attendu par le client
         clone.Parent = StarterGui
-        print("[AGORA] ScreenGui clone dans StarterGui")
+        print("[AGORA] ScreenGui clone dans StarterGui (nom=AgroaAdmin)")
     else
         warn("[AGORA] ScreenGui introuvable dans le dossier")
     end
