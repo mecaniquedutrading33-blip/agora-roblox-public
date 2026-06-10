@@ -1,178 +1,154 @@
--- Agora Admin Loader v15.0-fix7 - LocalScript auto-detect via ScreenGui
-local HttpService = game:GetService("HttpService")
+-- Agora Admin Loader v16.0 - Mode StarterGui direct (ScreenGui deja dans StarterGui)
+-- Place ce Script dans ServerScriptService/TON_DOSSIER/
+-- Place le ScreenGui (avec LocalScript DEDANS) dans StarterGui
+
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
-local StarterPlayer = game:GetService("StarterPlayer")
 
-local loaderScript = script
-local folder = loaderScript.Parent
+local isStudio = RunService:IsStudio()
 
-print("[AGORA] Loader v15.0 demarrage...")
+-- 1) Trouver Settings.lua dans le dossier actuel
+local scriptFolder = script.Parent
+print("[AGORA v16] Chargement depuis dossier : " .. scriptFolder.Name)
 
--- 1. SETTINGS (optionnel)
-local cfg = {}
-local settingsModule = folder:FindFirstChild("Settings")
-if settingsModule then
-    local ok, result = pcall(require, settingsModule)
-    if ok and type(result) == "table" then
-        cfg = result
-        print("[AGORA] Settings charge")
-    else
-        warn("[AGORA] Settings invalide, config vide utilisee")
-    end
-end
-
--- Valeurs par defaut
-if type(cfg) ~= "table" then cfg = {} end
-if not cfg.Founders then cfg.Founders = {} end
-if not cfg.Prefix then cfg.Prefix = ";" end
-if not cfg.WebhookURL then cfg.WebhookURL = "" end
-if not cfg.FounderNames then cfg.FounderNames = {} end
-
--- 2. Fonctions _G placeholders (evite "Profil non reconnu")
-_G.Agora_getPlayerRole = function() return "Joueurs" end
-_G.Agora_isFounder     = function() return false end
-_G.Agora_isOwner       = function() return false end
-_G.Agora_isAdmin       = function() return false end
-_G.Agora_isMod         = function() return false end
-_G.Agora_isPremium     = function() return false end
-
--- 3. Clone UI dans StarterGui / StarterPlayerScripts
-local function setupUI()
-    print("[AGORA] Dossier enfants: " .. table.concat((function()
-        local names = {}
-        for _, c in ipairs(folder:GetChildren()) do table.insert(names, c.Name .. "(" .. c.ClassName .. ")") end
-        return names
-    end)(), ", "))
-    -- Chercher ScreenGui dans le dossier ou les descendants
-    local screenGui = folder:FindFirstChild("AgoraAdmin") or folder:FindFirstChild("ScreenGui")
-    if not screenGui then
-        for _, child in ipairs(folder:GetDescendants()) do
-            if child:IsA("ScreenGui") then
-                screenGui = child
-                break
-            end
-        end
-    end
-
-    if screenGui then
-        print("[AGORA] ScreenGui trouvé: " .. screenGui.Name)
-        -- Supprimer l'ancien dans StarterGui s'il existe
-        local old = StarterGui:FindFirstChild("AgoraAdmin")
-        if old then old:Destroy() end
-
-        local clone = screenGui:Clone()
-        clone.Name = "AgoraAdmin"  -- Forcer le nom attendu par le client
-        clone.Parent = StarterGui
-        print("[AGORA] ScreenGui clone dans StarterGui (" .. #screenGui:GetDescendants() .. " objets)")
-
-        -- Play Solo : le joueur local est déjà connecté, StarterGui ne réplique pas
-        for _, plr in ipairs(Players:GetPlayers()) do
-            local pg = plr:WaitForChild("PlayerGui", 3)
-            if pg then
-                local oldGui = pg:FindFirstChild("AgoraAdmin")
-                if oldGui then oldGui:Destroy() end
-                local localClone = screenGui:Clone()
-                localClone.Name = "AgoraAdmin"
-                localClone.Parent = pg
-                -- FORCER la visibilité de tous les boutons
-                localClone.Enabled = true
-                for _, child in ipairs(localClone:GetDescendants()) do
-                    if child:IsA("GuiButton") or child:IsA("ImageButton") or child:IsA("TextButton") then
-                        child.Visible = true
-                        print("[AGORA] Bouton '" .. child.Name .. "' forcé Visible=true")
-                    end
-                end
-                print("[AGORA] ScreenGui clone dans PlayerGui de " .. plr.Name .. " (" .. #localClone:GetDescendants() .. " objets)")
-            end
-        end
-    else
-        warn("[AGORA] ScreenGui introuvable dans le dossier")
-    end
-
-    -- VERIFIER que le ScreenGui contient un LocalScript (il doit y être pour Play Solo)
-    if screenGui then
-        local hasLS = false
-        for _, child in ipairs(screenGui:GetDescendants()) do
-            if child:IsA("LocalScript") then
-                hasLS = true
-                print("[AGORA] LocalScript detecte DANS le ScreenGui: " .. child.Name)
-                break
-            end
-        end
-        if not hasLS then
-            warn("[AGORA] !!! ScreenGui ne contient PAS de LocalScript !!!")
-            warn("[AGORA] Le bouton n'apparaitra PAS. Mets le LocalScript a l'interieur du ScreenGui.")
-        else
-            print("[AGORA] OK - Le LocalScript est dans le ScreenGui, il s'executera automatiquement")
+local settingsFile = scriptFolder:FindFirstChild("Settings")
+if not settingsFile then
+    for _, child in ipairs(scriptFolder:GetDescendants()) do
+        if child.Name == "Settings" and child:IsA("ModuleScript") then
+            settingsFile = child
+            break
         end
     end
 end
 
-setupUI()
-
--- 4. Fetch proxy
-local PROXY = "https://sagefoquydjxkgjyhqrm.supabase.co/functions/v1/agora-proxy"
-
-local function fetchFile(name)
-    local url = PROXY .. "?file=" .. name .. "&nocache=" .. tick()
-    print("[AGORA] Fetch " .. name .. " ...")
-    local success, result = pcall(HttpService.GetAsync, HttpService, url, true)
-    if not success then
-        warn("[AGORA] HTTP FAIL " .. name .. ": " .. tostring(result))
-        return nil
-    end
-    if not result or result:find("File not found") or #result < 50 then
-        warn("[AGORA] Fichier vide/introuvable: " .. name)
-        return nil
-    end
-    print("[AGORA] " .. name .. " recu (" .. #result .. " chars)")
-    return result
-end
-
-local mainSrc = fetchFile("MainModule.lua")
-if not mainSrc then error("[AGORA] Impossible de charger MainModule") end
-
-local cmdSrc = fetchFile("Commands.lua")
-if not cmdSrc then error("[AGORA] Impossible de charger Commands") end
-
--- 5. loadstring
-local okMm, MainModule = pcall(loadstring, mainSrc)
-if not okMm or typeof(MainModule) ~= "function" then
-    error("[AGORA] loadstring MainModule invalide")
-end
-
-local okCmd, commandsFn = pcall(loadstring, cmdSrc)
-if not okCmd or typeof(commandsFn) ~= "function" then
-    error("[AGORA] loadstring Commands invalide")
-end
-
-local commands = commandsFn()
-
--- 6. Lancer MainModule
-local ok, mm = pcall(MainModule, cfg, commands, folder)
-
-if not ok then
-    warn("[AGORA] MainModule crash: " .. tostring(mm))
+if not settingsFile then
+    error("[AGORA] Settings.lua introuvable dans " .. scriptFolder.Name .. ". Mets-le dans le meme dossier que le Loader.")
     return
 end
 
-if typeof(mm) == "function" then
-    -- MainModule retourne une fonction (return function(...) end)
-    local ok2, result = pcall(mm, cfg, commands, folder)
-    if ok2 then
-        if typeof(result) == "table" and typeof(result.Init) == "function" then
-            result:Init({Settings = cfg, ScriptRef = loaderScript})
-            print("[AGORA] v15.0 INIT OK (table mode)")
-        else
-            print("[AGORA] v15.0 INIT OK (function mode)")
-        end
-    else
-        warn("[AGORA] MainModule init crash: " .. tostring(result))
-    end
-elseif typeof(mm) == "table" and typeof(mm.Init) == "function" then
-    mm:Init({Settings = cfg, ScriptRef = loaderScript})
-    print("[AGORA] v15.0 INIT OK (table mode)")
-else
-    print("[AGORA] v15.0 INIT OK (inline mode)")
+local SETTINGS
+local ok, err = pcall(function()
+    SETTINGS = require(settingsFile)
+end)
+if not ok then
+    error("[AGORA] Erreur require Settings.lua : " .. tostring(err))
+    return
 end
+
+print("[AGORA] Settings charges : theme=" .. tostring(SETTINGS.Theme) .. " prefix=" .. tostring(SETTINGS.Prefix))
+
+-- 2) CREER SystemRemotes s'il n'existe pas
+local SystemRemotes = ReplicatedStorage:FindFirstChild("SystemRemotes")
+if not SystemRemotes then
+    SystemRemotes = Instance.new("Folder")
+    SystemRemotes.Name = "SystemRemotes"
+    SystemRemotes.Parent = ReplicatedStorage
+    print("[AGORA] SystemRemotes cree dans ReplicatedStorage")
+end
+
+local function ensureRemote(name, class)
+    local r = SystemRemotes:FindFirstChild(name)
+    if not r then
+        r = Instance.new(class)
+        r.Name = name
+        r.Parent = SystemRemotes
+        print("[AGORA] Remote cree : " .. name .. " (" .. class .. ")")
+    end
+    return r
+end
+
+ensureRemote("GetCmdsFunc", "RemoteFunction")
+ensureRemote("RefreshEvent", "RemoteEvent")
+ensureRemote("NotifEvent", "RemoteEvent")
+ensureRemote("FlyEvent", "RemoteEvent")
+ensureRemote("SettingsEvent", "RemoteEvent")
+ensureRemote("CmdBarEvent", "RemoteEvent")
+
+print("[AGORA] 6 remotes verifies dans SystemRemotes")
+
+-- 3) Charger MainModule (local ou distant)
+local function loadMainModule()
+    local module = scriptFolder:FindFirstChild("MainModule")
+    if module then
+        print("[AGORA] MainModule LOCAL trouve dans dossier")
+        return require(module)
+    end
+
+    if isStudio then
+        warn("[AGORA] MainModule absent et on est en Studio. Creer un MainModule basique local.")
+        return {
+            Init = function() print("[MainModule] Init local (stub)") end,
+            GetCommands = function() return {} end,
+            ExecCommand = function() return nil, "Stub" end
+        }
+    end
+
+    print("[AGORA] MainModule local absent. Tentative HTTP...")
+    local success = pcall(function()
+        module = game:GetService("InsertService"):LoadAsset(123456789)
+    end)
+    if success and module then
+        return require(module)
+    end
+
+    warn("[AGORA] MainModule introuvable. Serveur minimal actif.")
+    return {
+        Init = function() end,
+        GetCommands = function() return {} end,
+        ExecCommand = function() return nil, "MainModule absent" end
+    }
+end
+
+local MainModule = loadMainModule()
+if MainModule.Init then
+    local ok2, err2 = pcall(MainModule.Init, SystemRemotes, SETTINGS)
+    if not ok2 then warn("[AGORA] Erreur MainModule.Init : " .. tostring(err2)) end
+end
+
+-- 4) Setup commandes pour RemoteFunction
+local GetCmdsFunc = SystemRemotes:FindFirstChild("GetCmdsFunc")
+if GetCmdsFunc then
+    GetCmdsFunc.OnServerInvoke = function(player)
+        local cmds = {}
+        if MainModule.GetCommands then
+            local ok3, res = pcall(MainModule.GetCommands)
+            if ok3 then cmds = res or {} end
+        end
+        print("[AGORA] GetCmdsFunc invoque par " .. player.Name .. " -> " .. #cmds .. " commandes")
+        return cmds
+    end
+end
+
+-- 5) Handle ExecCommand via RefreshEvent (backward compat)
+local RefreshEvent = SystemRemotes:FindFirstChild("RefreshEvent")
+if RefreshEvent then
+    RefreshEvent.OnServerEvent:Connect(function(player, cmdData)
+        if type(cmdData) ~= "table" or not cmdData.cmd then return end
+        if MainModule.ExecCommand then
+            local ok4, res = pcall(MainModule.ExecCommand, player, cmdData.cmd, cmdData.args or {})
+            if not ok4 then warn("[AGORA] ExecCommand erreur : " .. tostring(res)) end
+        end
+    end)
+end
+
+-- 6) Log tous les joueurs qui joignent (verification que tout est pret)
+Players.PlayerAdded:Connect(function(plr)
+    print("[AGORA] Joueur connecte : " .. plr.Name)
+    local pg = plr:WaitForChild("PlayerGui", 5)
+    if pg then
+        local gui = pg:FindFirstChild("AgoraAdmin") or pg:FindFirstChild("ScreenGui") or pg:FindFirstChild("OpenButton")
+        if gui then
+            print("[AGORA] PlayerGui OK pour " .. plr.Name .. " : " .. gui.Name)
+        else
+            warn("[AGORA] AUCUN ScreenGui dans PlayerGui de " .. plr.Name .. "!")
+        end
+    end
+end)
+
+print("=========================================")
+print("[AGORA v16] SERVEUR PRET")
+print("[AGORA v16] ScreenGui doit etre dans StarterGui avec le LocalScript DEDANS")
+print("=========================================")
