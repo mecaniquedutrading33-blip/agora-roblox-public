@@ -92,8 +92,7 @@ local function tr(str)
 	return str
 end
 
-if _G.AgoraAdminLSLoaded then return end
-_G.AgoraAdminLSLoaded = true
+-- _G guard removed: causes silent failure on Studio replay because _G persists between Play/Stop
 
 local _GUARD = "_AgoraAdminLS_Running"
 if _G[_GUARD] then
