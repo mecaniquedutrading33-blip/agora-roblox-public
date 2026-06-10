@@ -58,7 +58,7 @@ local function setupUI()
         local clone = screenGui:Clone()
         clone.Name = "AgoraAdmin"  -- Forcer le nom attendu par le client
         clone.Parent = StarterGui
-        print("[AGORA] ScreenGui clone dans StarterGui")
+        print("[AGORA] ScreenGui clone dans StarterGui (" .. #screenGui:GetDescendants() .. " objets)")
 
         -- Play Solo : le joueur local est déjà connecté, StarterGui ne réplique pas
         for _, plr in ipairs(Players:GetPlayers()) do
@@ -69,7 +69,15 @@ local function setupUI()
                 local localClone = screenGui:Clone()
                 localClone.Name = "AgoraAdmin"
                 localClone.Parent = pg
-                print("[AGORA] ScreenGui clone dans PlayerGui de " .. plr.Name)
+                -- FORCER la visibilité de tous les boutons
+                localClone.Enabled = true
+                for _, child in ipairs(localClone:GetDescendants()) do
+                    if child:IsA("GuiButton") or child:IsA("ImageButton") or child:IsA("TextButton") then
+                        child.Visible = true
+                        print("[AGORA] Bouton '" .. child.Name .. "' forcé Visible=true")
+                    end
+                end
+                print("[AGORA] ScreenGui clone dans PlayerGui de " .. plr.Name .. " (" .. #localClone:GetDescendants() .. " objets)")
             end
         end
     else
