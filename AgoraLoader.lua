@@ -105,6 +105,18 @@ local function setupUI()
         local clone = clientScript:Clone()
         clone.Parent = StarterPlayer.StarterPlayerScripts
         print("[AGORA] LocalScript clone dans StarterPlayerScripts")
+
+        -- Play Solo : cloner aussi dans PlayerGui des joueurs déjà connectés pour exécution immédiate
+        for _, plr in ipairs(Players:GetPlayers()) do
+            local pg = plr:WaitForChild("PlayerGui", 3)
+            if pg then
+                local oldLs = pg:FindFirstChild(clientScript.Name)
+                if oldLs then oldLs:Destroy() end
+                local lsClone = clientScript:Clone()
+                lsClone.Parent = pg
+                print("[AGORA] LocalScript clone dans PlayerGui de " .. plr.Name .. " (execution immediate)")
+            end
+        end
     else
         warn("[AGORA] LocalScript client introuvable")
     end
