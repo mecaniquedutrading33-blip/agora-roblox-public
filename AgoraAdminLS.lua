@@ -107,9 +107,46 @@ end)
 local player = Players.LocalPlayer
 
 local playerGui = player:WaitForChild("PlayerGui")
+
+-- Attente avec retry pour Play Solo / replication
 local gui = playerGui:WaitForChild("AgoraAdmin", 8)
 if not gui then
-	
+	for i = 1, 20 do
+		task.wait(0.3)
+		gui = playerGui:FindFirstChild("AgoraAdmin")
+		if gui then break end
+	end
+end
+
+-- Fallback: chercher par contenu (bouton AdminLogoBtn ou OpenButton)
+if not gui then
+	for _, child in ipairs(playerGui:GetChildren()) do
+		if child:IsA("ScreenGui") and (child:FindFirstChild("AdminLogoBtn") or child:FindFirstChild("OpenButton")) then
+			gui = child
+			break
+		end
+	end
+end
+
+if not gui then
+	-- ERREUR VISIBLE à l'ecran (pas juste print)
+	local errGui = Instance.new("ScreenGui")
+	errGui.Name = "AgoraError"
+	errGui.ResetOnSpawn = false
+	errGui.Parent = playerGui
+	local lbl = Instance.new("TextLabel")
+	lbl.Parent = errGui
+	lbl.Size = UDim2.new(0, 500, 0, 120)
+	lbl.Position = UDim2.new(0.5, -250, 0, 20)
+	lbl.BackgroundColor3 = Color3.fromRGB(180, 20, 20)
+	lbl.BackgroundTransparency = 0.1
+	lbl.Text = "[AGORA ERROR]\nScreenGui introuvable dans PlayerGui.\nVerifiez que le Loader est bien dans ServerScriptService et que le ScreenGui est dans le meme dossier que le Loader."
+	lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+	lbl.Font = Enum.Font.GothamBold
+	lbl.TextSize = 16
+	lbl.TextWrapped = true
+	lbl.ZIndex = 99999
+	warn("[AGORA] ScreenGui introuvable dans PlayerGui apres 20 retries")
 	return
 end
 
@@ -122,8 +159,12 @@ gui.DisplayOrder = 99999
 
 local adminBtn = gui:WaitForChild("AdminLogoBtn", 5)
 if not adminBtn then
-	
-	return
+	-- Fallback: chercher OpenButton
+	adminBtn = gui:FindFirstChild("OpenButton")
+	if not adminBtn then
+		warn("[AGORA] AdminLogoBtn et OpenButton introuvables dans le ScreenGui")
+		return
+	end
 end
 
 local corner = adminBtn:FindFirstChildOfClass("UICorner")
