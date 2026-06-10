@@ -1,4 +1,4 @@
--- Agora Admin Loader v16.0 - Mode StarterGui direct (ScreenGui deja dans StarterGui)
+-- Agora Admin Loader v16.1 - Mode StarterGui direct (ScreenGui deja dans StarterGui)
 -- Place ce Script dans ServerScriptService/TON_DOSSIER/
 -- Place le ScreenGui (avec LocalScript DEDANS) dans StarterGui
 
@@ -12,7 +12,7 @@ local isStudio = RunService:IsStudio()
 
 -- 1) Trouver Settings.lua dans le dossier actuel
 local scriptFolder = script.Parent
-print("[AGORA v16] Chargement depuis dossier : " .. scriptFolder.Name)
+print("[AGORA v16.1] Chargement depuis dossier : " .. scriptFolder.Name)
 
 local settingsFile = scriptFolder:FindFirstChild("Settings")
 if not settingsFile then
@@ -77,24 +77,55 @@ local function loadMainModule()
         return require(module)
     end
 
-    if isStudio then
-        warn("[AGORA] MainModule absent et on est en Studio. Creer un MainModule basique local.")
-        return {
-            Init = function() print("[MainModule] Init local (stub)") end,
-            GetCommands = function() return {} end,
-            ExecCommand = function() return nil, "Stub" end
-        }
-    end
-
     print("[AGORA] MainModule local absent. Tentative HTTP...")
-    local success = pcall(function()
-        module = game:GetService("InsertService"):LoadAsset(123456789)
+    local HttpService = game:GetService("HttpService")
+    local url = "https://raw.githubusercontent.com/mecaniquedutrading33-blip/agora-roblox-public/main/MainModule.lua?nocache=" .. tick()
+    
+    local ok, source = pcall(function()
+        return HttpService:GetAsync(url, true)
     end)
-    if success and module then
-        return require(module)
+    
+    if ok and source and #source > 1000 then
+        print("[AGORA] MainModule telecharge (" .. #source .. " chars)")
+        local ok2, loaderFn = pcall(function()
+            return loadstring(source)
+        end)
+        if ok2 and loaderFn then
+            local ok3, maybeFunc = pcall(function()
+                return loaderFn()
+            end)
+            if ok3 and type(maybeFunc) == "function" then
+                -- Le MainModule retourne une function — l'appeler pour tout initialiser
+                local ok4, result = pcall(function()
+                    return maybeFunc(SETTINGS, {}, script)
+                end)
+                if ok4 then
+                    print("[AGORA] MainModule initialise OK")
+                    return {
+                        Init = function() end,
+                        GetCommands = function() return {} end,
+                        ExecCommand = function() return nil, "Handled by MainModule" end
+                    }
+                else
+                    warn("[AGORA] Erreur execution MainModule: " .. tostring(result))
+                end
+            elseif ok3 and type(maybeFunc) == "table" then
+                return maybeFunc
+            else
+                warn("[AGORA] MainModule format inconnu: " .. type(maybeFunc))
+            end
+        else
+            warn("[AGORA] loadstring MainModule echoue: " .. tostring(loaderFn))
+        end
+    else
+        warn("[AGORA] HTTP MainModule echoue: " .. tostring(ok) .. " / len=" .. tostring(source and #source))
     end
 
-    warn("[AGORA] MainModule introuvable. Serveur minimal actif.")
+    if isStudio then
+        warn("[AGORA] MainModule absent. Serveur minimal actif (Studio).")
+    else
+        warn("[AGORA] MainModule introuvable. Serveur minimal actif.")
+    end
     return {
         Init = function() end,
         GetCommands = function() return {} end,
@@ -149,6 +180,6 @@ Players.PlayerAdded:Connect(function(plr)
 end)
 
 print("=========================================")
-print("[AGORA v16] SERVEUR PRET")
-print("[AGORA v16] ScreenGui doit etre dans StarterGui avec le LocalScript DEDANS")
+print("[AGORA v16.1] SERVEUR PRET")
+print("[AGORA v16.1] ScreenGui doit etre dans StarterGui avec le LocalScript DEDANS")
 print("=========================================")
