@@ -39,6 +39,11 @@ _G.Agora_isPremium     = function() return false end
 
 -- 3. Clone UI dans StarterGui / StarterPlayerScripts
 local function setupUI()
+    print("[AGORA] Dossier enfants: " .. table.concat((function()
+        local names = {}
+        for _, c in ipairs(folder:GetChildren()) do table.insert(names, c.Name .. "(" .. c.ClassName .. ")") end
+        return names
+    end)(), ", "))
     -- Chercher ScreenGui dans le dossier ou les descendants
     local screenGui = folder:FindFirstChild("AgoraAdmin") or folder:FindFirstChild("ScreenGui")
     if not screenGui then
@@ -51,6 +56,7 @@ local function setupUI()
     end
 
     if screenGui then
+        print("[AGORA] ScreenGui trouvé: " .. screenGui.Name)
         -- Supprimer l'ancien dans StarterGui s'il existe
         local old = StarterGui:FindFirstChild("AgoraAdmin")
         if old then old:Destroy() end
@@ -86,6 +92,7 @@ local function setupUI()
 
     -- Chercher LocalScript client
     local clientScript = folder:FindFirstChild("AgoraClient")
+    print("[AGORA] Recherche LocalScript...")
     if not clientScript then
         for _, child in ipairs(folder:GetDescendants()) do
             if child:IsA("LocalScript") then
@@ -96,6 +103,7 @@ local function setupUI()
     end
 
     if clientScript then
+        print("[AGORA] LocalScript trouvé: " .. clientScript.Name)
         local old = StarterPlayer:WaitForChild("StarterPlayerScripts", 2)
         if old then
             local oldClient = old:FindFirstChild(clientScript.Name)
@@ -118,7 +126,8 @@ local function setupUI()
             end
         end
     else
-        warn("[AGORA] LocalScript client introuvable")
+        warn("[AGORA] LocalScript client introuvable. Noms dans dossier:")
+        for _, c in ipairs(folder:GetChildren()) do warn("  - " .. c.Name .. " : " .. c.ClassName) end
     end
 end
 
