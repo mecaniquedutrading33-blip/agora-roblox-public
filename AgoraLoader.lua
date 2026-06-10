@@ -1,4 +1,4 @@
--- Agora Admin Loader v15.0 - Corrige function-return MainModule
+-- Agora Admin Loader v15.0-fix7 - LocalScript auto-detect via ScreenGui
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
@@ -90,44 +90,22 @@ local function setupUI()
         warn("[AGORA] ScreenGui introuvable dans le dossier")
     end
 
-    -- Chercher LocalScript client
-    local clientScript = folder:FindFirstChild("AgoraClient")
-    print("[AGORA] Recherche LocalScript...")
-    if not clientScript then
-        for _, child in ipairs(folder:GetDescendants()) do
+    -- VERIFIER que le ScreenGui contient un LocalScript (il doit y être pour Play Solo)
+    if screenGui then
+        local hasLS = false
+        for _, child in ipairs(screenGui:GetDescendants()) do
             if child:IsA("LocalScript") then
-                clientScript = child
+                hasLS = true
+                print("[AGORA] LocalScript detecte DANS le ScreenGui: " .. child.Name)
                 break
             end
         end
-    end
-
-    if clientScript then
-        print("[AGORA] LocalScript trouvé: " .. clientScript.Name)
-        local old = StarterPlayer:WaitForChild("StarterPlayerScripts", 2)
-        if old then
-            local oldClient = old:FindFirstChild(clientScript.Name)
-            if oldClient then oldClient:Destroy() end
+        if not hasLS then
+            warn("[AGORA] !!! ScreenGui ne contient PAS de LocalScript !!!")
+            warn("[AGORA] Le bouton n'apparaitra PAS. Mets le LocalScript a l'interieur du ScreenGui.")
+        else
+            print("[AGORA] OK - Le LocalScript est dans le ScreenGui, il s'executera automatiquement")
         end
-
-        local clone = clientScript:Clone()
-        clone.Parent = StarterPlayer.StarterPlayerScripts
-        print("[AGORA] LocalScript clone dans StarterPlayerScripts")
-
-        -- Play Solo : cloner aussi dans PlayerGui des joueurs déjà connectés pour exécution immédiate
-        for _, plr in ipairs(Players:GetPlayers()) do
-            local pg = plr:WaitForChild("PlayerGui", 3)
-            if pg then
-                local oldLs = pg:FindFirstChild(clientScript.Name)
-                if oldLs then oldLs:Destroy() end
-                local lsClone = clientScript:Clone()
-                lsClone.Parent = pg
-                print("[AGORA] LocalScript clone dans PlayerGui de " .. plr.Name .. " (execution immediate)")
-            end
-        end
-    else
-        warn("[AGORA] LocalScript client introuvable. Noms dans dossier:")
-        for _, c in ipairs(folder:GetChildren()) do warn("  - " .. c.Name .. " : " .. c.ClassName) end
     end
 end
 
